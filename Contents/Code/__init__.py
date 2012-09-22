@@ -2,7 +2,6 @@ import re
 
 ####################################################################################################
 
-PHOTOS_PREFIX = "/photos/nationalgeographic"
 VIDEO_PREFIX = "/video/nationalgeographic"
 POD_FEED = "http://feeds.nationalgeographic.com/ng/photography/photo-of-the-day/"
 
@@ -22,9 +21,6 @@ NEXT          = 'icon-more.png'
 
 ####################################################################################################
 def Start():
-    Plugin.AddPrefixHandler(PHOTOS_PREFIX, PhotosMainMenu, L('PhotosTitle'), ICON, ART)
-    Plugin.AddPrefixHandler(VIDEO_PREFIX, VideosMainMenu, L('VideoTitle'), ICON, ART)
-
     Plugin.AddViewGroup("InfoList", viewMode="InfoList", mediaType="items")
     Plugin.AddViewGroup("List", viewMode="List", mediaType="items")
     Plugin.AddViewGroup("Pictures", viewMode="Pictures", mediaType="photos")
@@ -45,6 +41,7 @@ def Start():
     HTTP.Headers['User-Agent'] = "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.2.16) Gecko/20110319 Firefox/3.6.16"
 
 ####################################################################################################
+@handler('/video/nationalgeographic', L('VideoTitle'), art = ART, thumb = ICON)
 def VideosMainMenu():
     oc = ObjectContainer()
 
@@ -57,6 +54,7 @@ def VideosMainMenu():
     return oc
 
 ####################################################################################################
+@route('/video/nationalgeographic/{id}')
 def ChannelVideoCategory(id, name):
     oc = ObjectContainer()
 
@@ -80,11 +78,12 @@ def ChannelVideoCategory(id, name):
     return oc
 
 ####################################################################################################
-def ChannelVideoPlaylist(id, name, page = 0):
+@route('/video/nationalgeographic/{id}/playlist', allow_sync = True)
+def ChannelVideoPlaylist(id, name):
     oc = ObjectContainer(view_group="InfoList")
 
     # Iterate over all the available playlist and extract the available information.
-    playlist = JSON.ObjectFromURL(JSON_PLAYLIST_URL % (id, str(page)))
+    playlist = JSON.ObjectFromURL(JSON_PLAYLIST_URL % (id, str(0)))
     for video in playlist['lineup']['video']:
         name = video['title'].replace('&#45;', '-')
         summary = video['caption']
@@ -126,6 +125,7 @@ def ChannelVideoPlaylist(id, name, page = 0):
     return oc
 
 ####################################################################################################
+@handler('/photos/nationalgeographic', L('PhotosTitle'), art = ART, thumb = ICON)
 def PhotosMainMenu():
     oc = ObjectContainer(view_group = 'Pictures')
     

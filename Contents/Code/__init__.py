@@ -1,11 +1,4 @@
-import re
-
-####################################################################################################
-
-VIDEO_PREFIX = "/video/nationalgeographic"
 POD_FEED = "http://feeds.nationalgeographic.com/ng/photography/photo-of-the-day/"
-
-
 BASE_URL = "http://video.nationalgeographic.com"
 JSON_CAT_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/main_sections.json"
 JSON_CHANNEL_CAT_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/category_%s.json"
@@ -13,11 +6,11 @@ JSON_PLAYLIST_URL = "http://video.nationalgeographic.com/video/player/data/mp4/j
 JSON_VIDEO_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/video_%s.json"
 
 NAME = L('Title')
+RE_DURATION = Regex('(?P<mins>[0-9]+):(?P<secs>[0-9]+)')
 
 # Default artwork and icon(s)
-ART           = 'art-default.jpg'
-ICON          = 'icon-default.png'
-NEXT          = 'icon-more.png'
+ART = 'art-default.jpg'
+ICON = 'icon-default.png'
 
 ####################################################################################################
 def Start():
@@ -90,7 +83,7 @@ def ChannelVideoPlaylist(id, name):
 
         duration_text = video['time']
         try:
-            duration_dict = re.match("(?P<mins>[0-9]+):(?P<secs>[0-9]+)", duration_text).groupdict()
+            duration_dict = RE_DURATION.match(duration_text).groupdict()
             mins = int(duration_dict['mins'])
             secs = int(duration_dict['secs'])
             duration = ((mins * 60) + secs) * 1000

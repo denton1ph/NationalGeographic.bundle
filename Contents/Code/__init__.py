@@ -50,10 +50,10 @@ def VideosMainMenu():
 
 ####################################################################################################
 @route('/video/nationalgeographic/{id}')
-def ChannelVideoCategory(id, name):
+def ChannelVideoCategory(id, name, parent=''):
 
 	oc = ObjectContainer()
-
+	
 	# Iterate over all the subcategories. It's possible that we actually find another sub-sub-category
 	# In this case, we will simply recursively call this function again until we find actual playlists.
 	sub_categories = JSON.ObjectFromURL(JSON_CHANNEL_CAT_URL % id)
@@ -62,9 +62,9 @@ def ChannelVideoCategory(id, name):
 
 		has_child = sub_category['hasChild']
 		if has_child == "true":
-			oc.add(DirectoryObject(key = Callback(ChannelVideoCategory, id = sub_category['id'], name = name), title = name))
+			oc.add(DirectoryObject(key = Callback(ChannelVideoCategory, id = sub_category['id'], name = name, parent=parent+'/'+id), title = name))
 		else:
-			oc.add(DirectoryObject(key = Callback(ChannelVideoPlaylist, id = sub_category['id'], name = name), title = name))
+			oc.add(DirectoryObject(key = Callback(ChannelVideoPlaylist, id = sub_category['id'], name = name, parent=parent+'/'+id), title = name))
 
 	# It's possible that there is actually no vidoes are available for the ipad. Unfortunately, they
 	# still provide us with empty containers...
@@ -75,12 +75,13 @@ def ChannelVideoCategory(id, name):
 
 ####################################################################################################
 @route('/video/nationalgeographic/{id}/playlist', allow_sync = True)
-def ChannelVideoPlaylist(id, name):
+def ChannelVideoPlaylist(id, name, parent=''):
 
 	oc = ObjectContainer(view_group="InfoList")
 
 	# Iterate over all the available playlist and extract the available information.
 	playlist = JSON.ObjectFromURL(JSON_PLAYLIST_URL % (id, str(0)))
+	parent = parent + '/' + playlist['lineup']['id']
 	for video in playlist['lineup']['video']:
 		name = video['title'].replace('&#45;', '-')
 		summary = video['caption']
@@ -92,7 +93,7 @@ def ChannelVideoPlaylist(id, name):
 			secs = int(duration_dict['secs'])
 			duration = ((mins * 60) + secs) * 1000
 		except:
-			 duration = 0
+			duration = 0
 
 		# In order to obtain the actual url, we need to call the specific JSON page. This will also
 		# include a high resolution thumbnail that can be used. We've found a small number of JSON
@@ -101,8 +102,9 @@ def ChannelVideoPlaylist(id, name):
 		video_details = JSON.ObjectFromURL(JSON_VIDEO_URL % video['id'])
 		url = BASE_URL + video_details['video']['url']
 		if url == "http://video.nationalgeographic.com/video/player/":
-			continue
-
+			url = 'http://video.nationalgeographic.com/video/' + parent +'/' + video['id']
+		else:
+			url = url.rsplit('.html',1)[0] + '#BREADCRUMBS=/video' + parent +'/' + video['id']
 		thumb = video_details['video']['still']
 		if thumb.startswith("http://") == False:
 			thumb = BASE_URL + thumb

@@ -32,7 +32,7 @@ def VideosMainMenu():
 	# Iterate over all of the available categories and display them to the user.
 	categories = JSON.ObjectFromURL(JSON_CAT_URL)
 	for category in categories['sectionlist']['section']:
-		name = category['label']
+		name = category['label'].replace(' Video', '')
 		oc.add(DirectoryObject(key = Callback(ChannelVideoCategory, id = category['id'], name = CleanName(name)), title = name))
 
 	return oc

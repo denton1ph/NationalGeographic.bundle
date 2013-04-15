@@ -8,10 +8,6 @@ JSON_VIDEO_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json
 NAME = L('Title')
 RE_DURATION = Regex('(?P<mins>[0-9]+):(?P<secs>[0-9]+)')
 
-# Default artwork and icon(s)
-ART = 'art-default.jpg'
-ICON = 'icon-default.png'
-
 ####################################################################################################
 def Start():
 
@@ -20,22 +16,15 @@ def Start():
 	Plugin.AddViewGroup("Pictures", viewMode="Pictures", mediaType="photos")
 
 	# Set the default ObjectContainer attributes
-	ObjectContainer.art = R(ART)
 	ObjectContainer.title1 = NAME
 	ObjectContainer.view_group = "List"
 
-	# Default icons for DirectoryObject and WebVideoItem
-	DirectoryObject.thumb = R(ICON)
-	DirectoryObject.art = R(ART)
-	VideoClipObject.thumb = R(ICON)
-	VideoClipObject.art = R(ART)
-
 	# Set the default cache time
 	HTTP.CacheTime = CACHE_1HOUR
-	HTTP.Headers['User-Agent'] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:15.0) Gecko/20100101 Firefox/15.0.1"
+	HTTP.Headers['User-Agent'] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:20.0) Gecko/20100101 Firefox/20.0"
 
 ####################################################################################################
-@handler('/video/nationalgeographic', L('VideoTitle'), art = ART, thumb = ICON)
+@handler('/video/nationalgeographic', L('VideoTitle'))
 def VideosMainMenu():
 
 	oc = ObjectContainer()
@@ -68,8 +57,8 @@ def ChannelVideoCategory(id, name, parent=''):
 
 	# It's possible that there is actually no vidoes are available for the ipad. Unfortunately, they
 	# still provide us with empty containers...
-	if len(oc) == 0:
-		return MessageContainer(name, "There are no titles available for the requested item.")
+	if len(oc) < 1:
+		return ObjectContainer(header=name, message="There are no titles available for the requested item.")
 
 	return oc
 
@@ -114,20 +103,21 @@ def ChannelVideoPlaylist(id, name, parent=''):
 			title = CleanName(name), 
 			summary = String.StripTags(summary.strip()), 
 			thumb = thumb,
-			duration = duration))
+			duration = duration
+		))
 
 	# It's possible that there is actually no vidoes are available for the ipad. Unfortunately, they
 	# still provide us with empty containers...
-	if len(oc) == 0:
-		return MessageContainer(name, "There are no titles available for the requested item.")
+	if len(oc) < 1:
+		return ObjectContainer(header=name, message="There are no titles available for the requested item.")
 	
 	return oc
 
 ####################################################################################################
-@handler('/photos/nationalgeographic', L('PhotosTitle'), art = ART, thumb = ICON)
+@handler('/photos/nationalgeographic', L('PhotosTitle'))
 
 def PhotosMainMenu():
-	oc = ObjectContainer(view_group = 'Pictures')
+	oc = ObjectContainer(view_group='Pictures')
 	
 	feed = XML.ElementFromURL(POD_FEED, errors='ignore')
 	for item in feed.xpath('//item'):

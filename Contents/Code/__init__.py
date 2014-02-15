@@ -33,7 +33,7 @@ def VideosMainMenu():
 	categories = JSON.ObjectFromURL(JSON_CAT_URL)
 	for category in categories['sectionlist']['section']:
 		name = category['label'].replace(' Video', '')
-		oc.add(DirectoryObject(key = Callback(ChannelVideoCategory, id = category['id'], name = CleanName(name)), title = name))
+		oc.add(DirectoryObject(key = Callback(ChannelVideoCategory, id = category['id'], name = String.DecodeHTMLEntities(name)), title = name))
 
 	return oc
 
@@ -47,7 +47,7 @@ def ChannelVideoCategory(id, name, parent=''):
 	# In this case, we will simply recursively call this function again until we find actual playlists.
 	sub_categories = JSON.ObjectFromURL(JSON_CHANNEL_CAT_URL % id)
 	for sub_category in sub_categories['section']['children']:
-		name = CleanName(sub_category['label'])
+		name = String.DecodeHTMLEntities(sub_category['label'])
 
 		has_child = sub_category['hasChild']
 		if has_child == "true":

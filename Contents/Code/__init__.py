@@ -3,7 +3,7 @@ BASE_URL = "http://video.nationalgeographic.com"
 JSON_CAT_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/main_sections.json"
 JSON_CHANNEL_CAT_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/category_%s.json"
 JSON_PLAYLIST_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/lineup_%s_%s.json"
-JSON_VIDEO_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/video_%s.json"
+#JSON_VIDEO_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/video_%s.json"
 
 NAME = L('Title')
 RE_DURATION = Regex('(?P<mins>[0-9]+):(?P<secs>[0-9]+)')
@@ -63,15 +63,27 @@ def ChannelVideoCategory(id, name, parent=''):
 	return oc
 
 ####################################################################################################
-@route('/video/nationalgeographic/{id}/playlist', allow_sync = True)
-def ChannelVideoPlaylist(id, name, parent=''):
+@route('/video/nationalgeographic/{id}/playlist', page = int, allow_sync = True)
+def ChannelVideoPlaylist(id, name, parent='', page=0):
 
 	oc = ObjectContainer(view_group="InfoList")
 
 	# Iterate over all the available playlist and extract the available information.
-	playlist = JSON.ObjectFromURL(JSON_PLAYLIST_URL % (id, str(0)))
+	playlist = JSON.ObjectFromURL(JSON_PLAYLIST_URL % (id, str(page)))
+	section_name = name
 	parent = parent + '/' + playlist['lineup']['id']
 	for video in playlist['lineup']['video']:
+		# Instead of accessing the json for each video to get the url we build the url for all videos
+		# The site will resolve these videos to the appropriate page if needed
+		url = 'http://video.nationalgeographic.com/video/' + parent +'/' + video['id']
+		thumb = video['thumb']
+		# Skip locked videos
+		# TV provider(locked) info in not in the json but if the video is locked  _AUTH_ is in the image url
+		if '_AUTH_' in thumb:
+			continue
+		if thumb.startswith("http://") == False:
+			thumb = BASE_URL + thumb
+            
 		name = video['title'].replace('&#45;', '-')
 		summary = video['caption']
 
@@ -84,19 +96,6 @@ def ChannelVideoPlaylist(id, name, parent=''):
 		except:
 			duration = 0
 
-		# In order to obtain the actual url, we need to call the specific JSON page. This will also
-		# include a high resolution thumbnail that can be used. We've found a small number of JSON
-		# pages which don't actually include the URL link. We should try and detect these and simply
-		# skip them.
-		video_details = JSON.ObjectFromURL(JSON_VIDEO_URL % video['id'])
-		url = BASE_URL + video_details['video']['url']
-		if url == "http://video.nationalgeographic.com/video/player/":
-			url = 'http://video.nationalgeographic.com/video/' + parent +'/' + video['id']
-		else:
-			url = url.rsplit('.html',1)[0] + '#BREADCRUMBS=/video' + parent +'/' + video['id']
-		thumb = video_details['video']['still']
-		if thumb.startswith("http://") == False:
-			thumb = BASE_URL + thumb
 		
 		oc.add(VideoClipObject(
 			url = url, 
@@ -106,10 +105,16 @@ def ChannelVideoPlaylist(id, name, parent=''):
 			duration = duration
 		))
 
+	# Paging
+	total_pages = int(playlist['lineup']['totalpages'])
+	page = page + 1
+	if page < total_pages:
+		oc.add(NextPageObject(key = Callback(ChannelVideoPlaylist, id=id, name=section_name, page=page), title = L("Next Page ...")))
+	
 	# It's possible that there is actually no vidoes are available for the ipad. Unfortunately, they
 	# still provide us with empty containers...
 	if len(oc) < 1:
-		return ObjectContainer(header=name, message="There are no titles available for the requested item.")
+		return ObjectContainer(header=name, message="There are no videos available for this category.")
 	
 	return oc
 

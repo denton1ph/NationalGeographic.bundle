@@ -68,48 +68,41 @@ def ChannelVideoPlaylist(id, name, parent='', page=0):
 
 	oc = ObjectContainer(view_group="InfoList")
 
-	# Iterate over all the available playlist and extract the available information.
-	playlist = JSON.ObjectFromURL(JSON_PLAYLIST_URL % (id, str(page)))
+	# Unable to properly resolve the urls from the json, so from this point on we us html
+	local_url = '%s/video/%s/%s/%s/' %(BASE_URL, parent, id, str(page))
 	section_name = name
-	parent = parent + '/' + playlist['lineup']['id']
-	for video in playlist['lineup']['video']:
-		# Instead of accessing the json for each video to get the url we build the url for all videos
-		# The site will resolve these videos to the appropriate page if needed
-		url = 'http://video.nationalgeographic.com/video/' + parent +'/' + video['id']
-		thumb = video['thumb']
+	data = HTML.ElementFromURL(local_url)
+	for video in data.xpath('//ul[contains(@class,"grid")]/li/div[@class="vidthumb"]'):
+		try: lock = video.xpath('./span[@class="vidtimestamp"]/span/@class')[0]
+		except: lock = None
 		# Skip locked videos
-		# TV provider(locked) info in not in the json but if the video is locked  _AUTH_ is in the image url
-		if '_AUTH_' in thumb:
+		if lock:
 			continue
-		if thumb.startswith("http://") == False:
+		url = BASE_URL + video.xpath('./a/@href')[0]
+		if not url.startswith("http://"):
+			url = BASE_URL + url
+		thumb = video.xpath('.//img/@src')[0]
+		if not thumb.startswith("http://"):
 			thumb = BASE_URL + thumb
-            
-		name = video['title'].replace('&#45;', '-')
-		summary = video['caption']
-
-		duration_text = video['time']
-		try:
-			duration_dict = RE_DURATION.match(duration_text).groupdict()
-			mins = int(duration_dict['mins'])
-			secs = int(duration_dict['secs'])
-			duration = ((mins * 60) + secs) * 1000
-		except:
-			duration = 0
+		name = String.DecodeHTMLEntities(video.xpath('./a/@title')[0])
+		duration = video.xpath('./span[@class="vidtimestamp"]//text()')[0].strip()
+		try: duration = Datetime.MillisecondsFromString(duration)
+		except: duration = None
 
 		
 		oc.add(VideoClipObject(
 			url = url, 
-			title = CleanName(name), 
-			summary = String.StripTags(summary.strip()), 
+			title = name, 
 			thumb = thumb,
 			duration = duration
 		))
 
 	# Paging
-	total_pages = int(playlist['lineup']['totalpages'])
-	page = page + 1
-	if page < total_pages:
-		oc.add(NextPageObject(key = Callback(ChannelVideoPlaylist, id=id, name=section_name, page=page), title = L("Next Page ...")))
+	pages = data.xpath('.//nav[contains(@class, "pagination")]/li/a//text()')
+	for item in pages:
+		if 'Next' in item:
+			page = page + 1
+			oc.add(NextPageObject(key = Callback(ChannelVideoPlaylist, id=id, parent=parent, name=section_name, page=page), title = L("Next Page ...")))
 	
 	# It's possible that there is actually no vidoes are available for the ipad. Unfortunately, they
 	# still provide us with empty containers...
@@ -153,13 +146,3 @@ def PhotosMainMenu():
 			originally_available_at = date))
 			
 	return oc
-
-####################################################################################################
-def CleanName(name):
-
-	# Function cleans up HTML ascii stuff	
-	remove = [('&amp;','&'),('&quot;','"'),('&#233;','e'),('&#8212;',' - '),('&#39;','\''),('&#46;','.'),('&#58;',':'), ('&#8482;','')]
-	for trash, crap in remove:
-		name = name.replace(trash,crap)
-
-	return name.strip()

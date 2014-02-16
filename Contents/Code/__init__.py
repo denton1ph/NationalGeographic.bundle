@@ -3,7 +3,7 @@ BASE_URL = "http://video.nationalgeographic.com"
 JSON_CAT_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/main_sections.json"
 JSON_CHANNEL_CAT_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/category_%s.json"
 JSON_PLAYLIST_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/lineup_%s_%s.json"
-JSON_VIDEO_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/video_%s.json"
+#JSON_VIDEO_URL = "http://video.nationalgeographic.com/video/player/data/mp4/json/video_%s.json"
 
 NAME = L('Title')
 RE_DURATION = Regex('(?P<mins>[0-9]+):(?P<secs>[0-9]+)')
@@ -33,7 +33,7 @@ def VideosMainMenu():
 	categories = JSON.ObjectFromURL(JSON_CAT_URL)
 	for category in categories['sectionlist']['section']:
 		name = category['label'].replace(' Video', '')
-		oc.add(DirectoryObject(key = Callback(ChannelVideoCategory, id = category['id'], name = CleanName(name)), title = name))
+		oc.add(DirectoryObject(key = Callback(ChannelVideoCategory, id = category['id'], name = String.DecodeHTMLEntities(name)), title = name))
 
 	return oc
 
@@ -47,7 +47,7 @@ def ChannelVideoCategory(id, name, parent=''):
 	# In this case, we will simply recursively call this function again until we find actual playlists.
 	sub_categories = JSON.ObjectFromURL(JSON_CHANNEL_CAT_URL % id)
 	for sub_category in sub_categories['section']['children']:
-		name = CleanName(sub_category['label'])
+		name = String.DecodeHTMLEntities(sub_category['label'])
 
 		has_child = sub_category['hasChild']
 		if has_child == "true":
@@ -63,53 +63,51 @@ def ChannelVideoCategory(id, name, parent=''):
 	return oc
 
 ####################################################################################################
-@route('/video/nationalgeographic/{id}/playlist', allow_sync = True)
-def ChannelVideoPlaylist(id, name, parent=''):
+@route('/video/nationalgeographic/{id}/playlist', page = int, allow_sync = True)
+def ChannelVideoPlaylist(id, name, parent='', page=0):
 
 	oc = ObjectContainer(view_group="InfoList")
 
-	# Iterate over all the available playlist and extract the available information.
-	playlist = JSON.ObjectFromURL(JSON_PLAYLIST_URL % (id, str(0)))
-	parent = parent + '/' + playlist['lineup']['id']
-	for video in playlist['lineup']['video']:
-		name = video['title'].replace('&#45;', '-')
-		summary = video['caption']
-
-		duration_text = video['time']
-		try:
-			duration_dict = RE_DURATION.match(duration_text).groupdict()
-			mins = int(duration_dict['mins'])
-			secs = int(duration_dict['secs'])
-			duration = ((mins * 60) + secs) * 1000
-		except:
-			duration = 0
-
-		# In order to obtain the actual url, we need to call the specific JSON page. This will also
-		# include a high resolution thumbnail that can be used. We've found a small number of JSON
-		# pages which don't actually include the URL link. We should try and detect these and simply
-		# skip them.
-		video_details = JSON.ObjectFromURL(JSON_VIDEO_URL % video['id'])
-		url = BASE_URL + video_details['video']['url']
-		if url == "http://video.nationalgeographic.com/video/player/":
-			url = 'http://video.nationalgeographic.com/video/' + parent +'/' + video['id']
-		else:
-			url = url.rsplit('.html',1)[0] + '#BREADCRUMBS=/video' + parent +'/' + video['id']
-		thumb = video_details['video']['still']
-		if thumb.startswith("http://") == False:
+	# Unable to properly resolve the urls from the json, so from this point on we us html
+	local_url = '%s/video/%s/%s/%s/' %(BASE_URL, parent, id, str(page))
+	section_name = name
+	data = HTML.ElementFromURL(local_url)
+	for video in data.xpath('//ul[contains(@class,"grid")]/li/div[@class="vidthumb"]'):
+		try: lock = video.xpath('./span[@class="vidtimestamp"]/span/@class')[0]
+		except: lock = None
+		# Skip locked videos
+		if lock:
+			continue
+		url = BASE_URL + video.xpath('./a/@href')[0]
+		if not url.startswith("http://"):
+			url = BASE_URL + url
+		thumb = video.xpath('.//img/@src')[0]
+		if not thumb.startswith("http://"):
 			thumb = BASE_URL + thumb
+		name = String.DecodeHTMLEntities(video.xpath('./a/@title')[0])
+		duration = video.xpath('./span[@class="vidtimestamp"]//text()')[0].strip()
+		try: duration = Datetime.MillisecondsFromString(duration)
+		except: duration = None
+
 		
 		oc.add(VideoClipObject(
 			url = url, 
-			title = CleanName(name), 
-			summary = String.StripTags(summary.strip()), 
+			title = name, 
 			thumb = thumb,
 			duration = duration
 		))
 
+	# Paging
+	pages = data.xpath('.//nav[contains(@class, "pagination")]/li/a//text()')
+	for item in pages:
+		if 'Next' in item:
+			page = page + 1
+			oc.add(NextPageObject(key = Callback(ChannelVideoPlaylist, id=id, parent=parent, name=section_name, page=page), title = L("Next Page ...")))
+	
 	# It's possible that there is actually no vidoes are available for the ipad. Unfortunately, they
 	# still provide us with empty containers...
 	if len(oc) < 1:
-		return ObjectContainer(header=name, message="There are no titles available for the requested item.")
+		return ObjectContainer(header=name, message="There are no videos available for this category.")
 	
 	return oc
 
@@ -148,13 +146,3 @@ def PhotosMainMenu():
 			originally_available_at = date))
 			
 	return oc
-
-####################################################################################################
-def CleanName(name):
-
-	# Function cleans up HTML ascii stuff	
-	remove = [('&amp;','&'),('&quot;','"'),('&#233;','e'),('&#8212;',' - '),('&#39;','\''),('&#46;','.'),('&#58;',':'), ('&#8482;','')]
-	for trash, crap in remove:
-		name = name.replace(trash,crap)
-
-	return name.strip()

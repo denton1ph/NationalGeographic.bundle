@@ -120,7 +120,7 @@ def PhotosMainMenu():
 	feed = XML.ElementFromURL(POD_FEED, errors='ignore')
 	for item in feed.xpath('//item'):
 		title = item.xpath('./title')[0].text
-		url = item.xpath('./guid')[0].text
+		url = item.xpath('./feedburner:origLink' , namespaces={'feedburner':'http://rssnamespace.org/feedburner/ext/1.0'})[0].text
 		thumb = item.xpath('./enclosure')[0].get('url')
 	
 		
